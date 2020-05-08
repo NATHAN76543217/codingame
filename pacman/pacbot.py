@@ -1,7 +1,7 @@
 import sys
 import math
 import time
-
+import random
 # Grab the pellets as fast as you can!
 class case():
 	def __init__(self, x, y, char, pellet = 0, value = 0):
@@ -54,7 +54,8 @@ class pac_man():
 		print("ways:", ways, file=sys.stderr)
 		return ways
 	def get_pellets(self, my_map, i):
-		score = 0
+	#recupere la valeur d'un chemin
+		#initialise dx et dy en fonction de l'orientation du chemin
 		dx = 0
 		dy = 0
 		if i == 0:
@@ -67,29 +68,49 @@ class pac_man():
 			dx = -1
 		my = dy
 		mx = dx
+		score = 0
 		while 1:
-			if self.x + mx == width:
+		#Pour chaque cases
+		#gere le passage d'un cote de la map a l'autre
+			if self.x + mx == width - 1 and my_map[self.y + my][self.x + mx].char != '#':
+				mx -= width -1
+			elif self.x + mx == width:
 				mx -= width
-			elif self.x +mx == 0 and my_map[self.y + my][self.x +mx].char != '#':
-				mx += width -1
+			elif self.x + mx == 0 and my_map[self.y + my][self.x + mx].char != '#' and i == 3:
+				mx += width - 1
+		#recupere la case actuelle
 			ma_case = my_map[self.y + my][self.x + mx]
+		#si il y a un pellet sur la case augmente le score	
 			if ma_case.pellet == 1:
 				score += 1
-			# elif ma_case.char == ' ':
-			# 	score -= 1
+		#si la case est vide diminuer le score
+			elif ma_case.char == ' ':
+				score -= 1
+		#si c'est un mur arreter de chercher et renvoyer le score
 			elif ma_case.char == '#':
 				return score, ma_case.x -dx, ma_case.y-dy
+		#sinon passer a la case d'apres
 			my += dy
 			mx += dx
+
+
+
 def Sqr(a):
+#recupere la carré de la valeur
 	return a*a
 def Distance(x1,y1,x2,y2):
-	return math.sqrt(Sqr(y2-y1)+Sqr(x2-x1))
-	
+#recupere la disctance netre deux points
+	return math.sqrt(Sqr(y2-y1)+Sqr(x2-x1))	
 def print_map(my_map):
+#affiche la map
 	for cle, ligne in enumerate(my_map):
 		for case in ligne:
 			print(case.char, file=sys.stderr)
+def get_random_pos():
+	w = random.randint(0, width)
+	h = random.randint(0, height)
+	return w, h
+
 # width: size of the grid
 # height: top left corner is (x=0, y=0)
 width, height = [int(i) for i in input().split()]
@@ -120,9 +141,10 @@ while True:
 	if visible_pac_count < old_visible_pac_count:
 		TURN = 0
 	if TURN == 0:
-	#recupere liste PAC-MAN
+	#Si c'est le premier tour, initialiser les listes des pac-man
 		TURN = 1
 		myPacList = []
+		enPacList = []
 		for i in range(visible_pac_count):
 			# pac_id: pac number (unique within a team)
 			# mine: true if this pac is yours
@@ -140,10 +162,13 @@ while True:
 			ability_cooldown = int(ability_cooldown)
 			if mine == 1:
 				myPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
+			else:
+				enPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
 	else:
-	#mettre a jour les information de mes pac-mans
+	# chaque tour mettre a jour les information de mes pac-mans
 		for i in range(visible_pac_count):
 			pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
+			#Pour moi
 			if mine == 1:
 				for pac in myPacList:
 					if pac_id == pac.id:
@@ -152,8 +177,16 @@ while True:
 						pac.type_id = type_id
 						pac.speed_turns_left = speed_turns_left
 						pac.ability_cooldown = ability_cooldown
+			#pour les ennemies
+			else:
+				for pac in enPacList:
+					if pac_id == pac.id:
+						pac.x = x
+						pac.y = y
+						pac.type_id = type_id
+						pac.speed_turns_left = speed_turns_left
+						pac.ability_cooldown = ability_cooldown
 
-	visible_pellet_count = int(input())  # all pellets in sight
 	#init my_map.pellet a 0
 	for ligne in my_map:
 		for case in ligne:
@@ -161,7 +194,8 @@ while True:
 			case.value = 0
 	pallet_list = []
 	big_pallet_list = []
-	#recupere liste pellet
+#recupere liste pellet
+	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
 		x, y, value = [int(j) for j in input().split()]
 		pallet_list.append((x, y, value))
@@ -171,26 +205,19 @@ while True:
 		my_map[y][x].value = value
 
 	for pac in myPacList:
-		#Pour chacun de mes pac
+	#Pour chacun de mes pac
 		print("for pac:", pac.id, file=sys.stderr)
 		poss = pac.get_way(my_map)
-		#recuperer les possibilités NESW
+	#recuperer les possibilités NESW
 		ways = []
 		for i in range(4):
 			if poss[i] == 1:
-				#si le chemin est degagé
 				way = pac.get_pellets(my_map, i)
-				# print("on way:", i, "pallet:", way, file=sys.stderr)
 				ways.append(way)
-		# print("ways not sorted", ways, file=sys.stderr)
 		ways.sort(reverse = True, key= lambda way: way[0])
+	#les trier par ordre de preference
 		print("ways sorted", ways, file=sys.stderr)
-		#####
-
-
-		#ajouter condition pour empecher de changer tout le temp de cible
-		#voir partie actuelle
-		####
+	#recherche des big proches
 		longest = 5
 		near = []
 		interupt = 0
@@ -201,7 +228,7 @@ while True:
 					longest = dist
 					near = big
 					interupt = 1
-		#si un big est plus proche que 5 cases
+	#si un big est plus proche que 5 cases
 		print("pac.big:", pac.big_target, file=sys.stderr)
 		if interupt == 1 or pac.big_target is not None:	
 			if pac.big_target is None:
@@ -213,7 +240,7 @@ while True:
 				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(pac.big_target[0]) + " "+ str(pac.big_target[1]) + " | ")
 				pac.big_target = None
 
-		# if toute les voies contiennent 0 pastille
+		# si toute les voies contiennent 0 pastille
 		elif ways[0][0] <= 0:
 			#recuperer la pastille la plus proche
 			longest = 10000  
@@ -224,11 +251,16 @@ while True:
 				if dist < longest:
 					longest = dist
 					near = pallet
-			# y aller
+			#rejoindre la plus proche	
 			if near != None:
 				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
+			# si il n'y a aucune pastille visible
 			else:
-				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(int(width/2)) + " " + str(int(height/2)) + " | ")
+				#aller au big le plus proche
+
+				#sinon aller a une position random
+				rand_pos = get_random_pos()
+				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(rand_pos[0]) + " " + str(rand_pos[1]) + " | ")
 		else:
 			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(ways[0][1]) + " "+ str(ways[0][2]) + " | ")
 
