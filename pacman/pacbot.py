@@ -1,5 +1,6 @@
 import sys
 import math
+import time
 
 # Grab the pellets as fast as you can!
 class case():
@@ -16,6 +17,8 @@ class pac_man():
 		self.y = y
 		self.pos = (x, y)
 		self.id = ID
+		self.big_target = None
+		self.count = -1
 	def get_way(self, my_map):
 		#renvoie 1 si libre sinon 0, pour les 4 directions
 		#gere la sortie droite
@@ -64,13 +67,15 @@ class pac_man():
 		while 1:
 			if self.x + mx == width:
 				mx -= width
-			elif self.x +mx == 0:
+			elif self.x +mx == 0 and my_map[self.y + my][self.x +mx].char != '#':
 				mx += width -1
 			ma_case = my_map[self.y + my][self.x + mx]
 			if ma_case.pellet == 1:
 				score += 1
-			if ma_case.char == '#':
-				return score, ma_case.x, ma_case.y
+			# elif ma_case.char == ' ':
+			# 	score -= 1
+			elif ma_case.char == '#':
+				return score, ma_case.x -dx, ma_case.y-dy
 			my += dy
 			mx += dx
 def Sqr(a):
@@ -96,12 +101,17 @@ for i in range(height):
 		P+=1
 	my_map.append(my_line)
 
+TURN = 0
 # print_map(my_map)
 # game loop
 while True:
+	# Debut du decompte du temps
+	start_time = time.time()
 	myPacList = [] #liste de tous mes pac_man
+	my_action = ""
 	my_score, opponent_score = [int(i) for i in input().split()]
 	visible_pac_count = int(input())  # all your pacs and enemy pacs in sight
+	#recupere liste PAC-MAN
 	for i in range(visible_pac_count):
 		# pac_id: pac number (unique within a team)
 		# mine: true if this pac is yours
@@ -127,18 +137,18 @@ while True:
 			case.value = 0
 	pallet_list = []
 	big_pallet_list = []
+	#recupere liste pellet
 	for i in range(visible_pellet_count):
-		# value: amount of points this pellet is worth
 		x, y, value = [int(j) for j in input().split()]
 		pallet_list.append((x, y, value))
 		if value > 1:
-			big_pallet_list.append((x, y, value))
+			big_pallet_list.append([x, y, value, 0])
 		my_map[y][x].pellet = 1
 		my_map[y][x].value = value
 
-		#print("pellet_list", x, y, value, file=sys.stderr)
 	for pac in myPacList:
 		#Pour chacun de mes pac
+		print("for pac:", pac.id, file=sys.stderr)
 		poss = pac.get_way(my_map)
 		#recuperer les possibilités NESW
 		ways = []
@@ -146,12 +156,11 @@ while True:
 			if poss[i] == 1:
 				#si le chemin est degagé
 				way = pac.get_pellets(my_map, i)
-				print("on way:", i, "pallet:", way, file=sys.stderr)
+				# print("on way:", i, "pallet:", way, file=sys.stderr)
 				ways.append(way)
-		print("ways not sorted", ways, file=sys.stderr)
+		# print("ways not sorted", ways, file=sys.stderr)
 		ways.sort(reverse = True, key= lambda way: way[0])
 		print("ways sorted", ways, file=sys.stderr)
-		interupt = 0
 		#####
 
 
@@ -159,29 +168,44 @@ while True:
 		#voir partie actuelle
 		####
 		longest = 5
+		near = []
+		interupt = 0
 		for big in big_pallet_list:
-			dist = Distance(big[0], big[1], pac.x, pac.y)
-			if dist <= longest:
-				longest = dist
-				near = big
-				interupt = 1
+			if big[3] == 0:
+				dist = Distance(big[0], big[1], pac.x, pac.y)
+				if dist <= longest:
+					longest = dist
+					near = big
+					interupt = 1
+		#si un big est plus proche que 5 cases
+		print("pac.big:", pac.big_target, file=sys.stderr)
+		if interupt == 1 or pac.big_target is not None:	
+			if pac.big_target is None:
+				near[3] = 1
+				pac.big_target = near
+				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(near[0]) + " "+ str(near[1]) + " | ")
+				print("after:", pac.big_target, file=sys.stderr)
+			else:
+				pac.big_target = None
+				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(pac.big_target[0]) + " "+ str(pac.big_target[1]) + " | ")
 
-		if interupt == 1:	
-				print("MOVE 0", near[0], near[1])
 		# if toute les voies contiennent 0 pastille
-		elif ways[0][0] == 0:
+		elif ways[0][0] <= 0:
 			#recuperer la pastille la plus proche
 			longest = 10000  
+			near = 0
 			for pallet in pallet_list:
 				dist = Distance(pallet[0], pallet[1], pac.x, pac.y)
 				if dist < longest:
 					longest = dist
 					near = pallet
 			# y aller
-			print("MOVE 0", near[0], near[1])
+			my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
 		else:
-			print("MOVE 0", ways[0][1], ways[0][2])
+			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(ways[0][1]) + " "+ str(ways[0][2]) + " | ")
 
+	print(my_action)
+	print("Temps d execution : %s ms ---" % ((time.time() - start_time) * 1000), file=sys.stderr)
 	# Write an action using print
 	# To debug: print("Debug messages...", file=sys.stderr)
 
