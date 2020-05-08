@@ -15,13 +15,15 @@ class pac_man():
 	def __init__(self, ID, x, y, type_id, speed_turns_lest, ability_cooldown, big_target = None):
 		self.x = x
 		self.y = y
-		self.pos = (x, y)
+		self.oldx = 0
+		self.oldy = 0
 		self.id = ID
 		self.type_id = type_id
 		self.speed_turns_left = speed_turns_left
 		self.ability_cooldown = ability_cooldown
 		self.big_target = big_target
-		self.count = -1
+		self.target = []
+
 	def get_way(self, my_map):
 		#renvoie 1 si libre sinon 0, pour les 4 directions
 		#gere la sortie droite
@@ -86,9 +88,9 @@ class pac_man():
 		#si la case est vide diminuer le score
 			elif ma_case.char == ' ':
 				score -= 1
-		#si c'est un mur arreter de chercher et renvoyer le score
+		#si c'est un mur arreter de chercher et renvoyer la position de la case avant le mur et le score 
 			elif ma_case.char == '#':
-				return score, ma_case.x -dx, ma_case.y-dy
+				return ma_case.x -dx, ma_case.y-dy, score
 		#sinon passer a la case d'apres
 			my += dy
 			mx += dx
@@ -107,8 +109,9 @@ def print_map(my_map):
 		for case in ligne:
 			print(case.char, file=sys.stderr)
 def get_random_pos():
-	w = random.randint(0, width)
-	h = random.randint(0, height)
+#renvoi une position random dans les limites de la map
+	w = random.randint(0, width -1)
+	h = random.randint(0, height -1)
 	return w, h
 
 # width: size of the grid
@@ -127,6 +130,7 @@ for i in range(height):
 
 TURN = 0
 myPacList = [] #liste de tous mes pac_man
+enPacList = [] #liste de tous les pac-man ennemies
 
 old_visible_pac_count = 100
 
@@ -140,8 +144,10 @@ while True:
 	visible_pac_count = int(input())  # all your pacs and enemy pacs in sight
 	if visible_pac_count < old_visible_pac_count:
 		TURN = 0
+
 	if TURN == 0:
 	#Si c'est le premier tour, initialiser les listes des pac-man
+		print("TURN 0", file=sys.stderr)
 		TURN = 1
 		myPacList = []
 		enPacList = []
@@ -168,6 +174,12 @@ while True:
 	# chaque tour mettre a jour les information de mes pac-mans
 		for i in range(visible_pac_count):
 			pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
+			pac_id = int(pac_id)
+			mine = mine != "0"
+			x = int(x)
+			y = int(y)
+			speed_turns_left = int(speed_turns_left)
+			ability_cooldown = int(ability_cooldown)
 			#Pour moi
 			if mine == 1:
 				for pac in myPacList:
@@ -192,9 +204,10 @@ while True:
 		for case in ligne:
 			case.pellet = 0
 			case.value = 0
+
+	#recupere liste pellet
 	pallet_list = []
 	big_pallet_list = []
-#recupere liste pellet
 	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
 		x, y, value = [int(j) for j in input().split()]
@@ -204,19 +217,28 @@ while True:
 		my_map[y][x].pellet = 1
 		my_map[y][x].value = value
 
+
+
+
 	for pac in myPacList:
-	#Pour chacun de mes pac
 		print("for pac:", pac.id, file=sys.stderr)
+	#si pac-man bloqué
+		if pac.oldx == pac.x and pac.oldy == pac.y:
+			print("pac blocked, x=", x, "y=", y, file=sys.stderr)
+			pac.target = get_random_pos()
+			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " "+ str(pac.target[1]) + " | ")
+			continue
+	#Pour chacun de mes pac
 		poss = pac.get_way(my_map)
 	#recuperer les possibilités NESW
 		ways = []
 		for i in range(4):
 			if poss[i] == 1:
-				way = pac.get_pellets(my_map, i)
-				ways.append(way)
-		ways.sort(reverse = True, key= lambda way: way[0])
+				ways.append(pac.get_pellets(my_map, i))
+		ways.sort(reverse = True, key= lambda way: way[2])
 	#les trier par ordre de preference
 		print("ways sorted", ways, file=sys.stderr)
+	
 	#recherche des big proches
 		longest = 5
 		near = []
@@ -234,14 +256,16 @@ while True:
 			if pac.big_target is None:
 				near[3] = 1
 				pac.big_target = near
-				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(near[0]) + " "+ str(near[1]) + " | ")
+				pac.target = near
+				# my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(near[0]) + " "+ str(near[1]) + " | ")
 				print("after:", pac.big_target, file=sys.stderr)
 			else:
-				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(pac.big_target[0]) + " "+ str(pac.big_target[1]) + " | ")
+				pac.target = pac.big_target
+				# my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(pac.big_target[0]) + " "+ str(pac.big_target[1]) + " | ")
 				pac.big_target = None
 
 		# si toute les voies contiennent 0 pastille
-		elif ways[0][0] <= 0:
+		elif ways[0][2] <= 0:
 			#recuperer la pastille la plus proche
 			longest = 10000  
 			near = None
@@ -253,23 +277,26 @@ while True:
 					near = pallet
 			#rejoindre la plus proche	
 			if near != None:
-				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
+				pac.target = near
+				# my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
 			# si il n'y a aucune pastille visible
 			else:
 				#aller au big le plus proche
 
 				#sinon aller a une position random
 				rand_pos = get_random_pos()
-				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(rand_pos[0]) + " " + str(rand_pos[1]) + " | ")
+				pac.target = rand_pos
+				# my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(rand_pos[0]) + " " + str(rand_pos[1]) + " | ")
 		else:
-			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(ways[0][1]) + " "+ str(ways[0][2]) + " | ")
-
+			#aller au bout du chemin
+			pac.target = ways[0]
+			# my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(ways[0][1]) + " "+ str(ways[0][2]) + " | ")
+		my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " "+ str(pac.target[1]) + " | ")
+		pac.oldx = pac.x
+		pac.oldy = pac.y
+	
 	print(my_action)
 	old_visible_pac_count = visible_pac_count
 	print("Temps d execution : %s ms ---" % ((time.time() - start_time) * 1000), file=sys.stderr)
-	
-	# Write an action using print
-	# To debug: print("Debug messages...", file=sys.stderr)
-
 	# MOVE <pacId> <x> <y>
 
