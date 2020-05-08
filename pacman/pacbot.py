@@ -12,12 +12,15 @@ class case():
 		self.value = value
 
 class pac_man():
-	def __init__(self, x, y, ID):
+	def __init__(self, ID, x, y, type_id, speed_turns_lest, ability_cooldown, big_target = None):
 		self.x = x
 		self.y = y
 		self.pos = (x, y)
 		self.id = ID
-		self.big_target = None
+		self.type_id = type_id
+		self.speed_turns_left = speed_turns_left
+		self.ability_cooldown = ability_cooldown
+		self.big_target = big_target
 		self.count = -1
 	def get_way(self, my_map):
 		#renvoie 1 si libre sinon 0, pour les 4 directions
@@ -102,33 +105,54 @@ for i in range(height):
 	my_map.append(my_line)
 
 TURN = 0
+myPacList = [] #liste de tous mes pac_man
+
+old_visible_pac_count = 100
+
 # print_map(my_map)
 # game loop
 while True:
 	# Debut du decompte du temps
 	start_time = time.time()
-	myPacList = [] #liste de tous mes pac_man
 	my_action = ""
 	my_score, opponent_score = [int(i) for i in input().split()]
 	visible_pac_count = int(input())  # all your pacs and enemy pacs in sight
+	if visible_pac_count < old_visible_pac_count:
+		TURN = 0
+	if TURN == 0:
 	#recupere liste PAC-MAN
-	for i in range(visible_pac_count):
-		# pac_id: pac number (unique within a team)
-		# mine: true if this pac is yours
-		# x: position in the grid
-		# y: position in the grid
-		# type_id: unused in wood leagues
-		# speed_turns_left: unused in wood leagues
-		# ability_cooldown: unused in wood leagues
-		pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
-		pac_id = int(pac_id)
-		mine = mine != "0"
-		x = int(x)
-		y = int(y)
-		speed_turns_left = int(speed_turns_left)
-		ability_cooldown = int(ability_cooldown)
-		if mine == 1:
-			myPacList.append(pac_man(x, y, pac_id))
+		TURN = 1
+		myPacList = []
+		for i in range(visible_pac_count):
+			# pac_id: pac number (unique within a team)
+			# mine: true if this pac is yours
+			# x: position in the grid
+			# y: position in the grid
+			# type_id: unused in wood leagues
+			# speed_turns_left: unused in wood leagues
+			# ability_cooldown: unused in wood leagues	
+			pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
+			pac_id = int(pac_id)
+			mine = mine != "0"
+			x = int(x)
+			y = int(y)
+			speed_turns_left = int(speed_turns_left)
+			ability_cooldown = int(ability_cooldown)
+			if mine == 1:
+				myPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
+	else:
+	#mettre a jour les information de mes pac-mans
+		for i in range(visible_pac_count):
+			pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
+			if mine == 1:
+				for pac in myPacList:
+					if pac_id == pac.id:
+						pac.x = x
+						pac.y = y
+						pac.type_id = type_id
+						pac.speed_turns_left = speed_turns_left
+						pac.ability_cooldown = ability_cooldown
+
 	visible_pellet_count = int(input())  # all pellets in sight
 	#init my_map.pellet a 0
 	for ligne in my_map:
@@ -186,26 +210,32 @@ while True:
 				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(near[0]) + " "+ str(near[1]) + " | ")
 				print("after:", pac.big_target, file=sys.stderr)
 			else:
-				pac.big_target = None
 				my_action = my_action + ("MOVE " + str(pac.id) + " "+ str(pac.big_target[0]) + " "+ str(pac.big_target[1]) + " | ")
+				pac.big_target = None
 
 		# if toute les voies contiennent 0 pastille
 		elif ways[0][0] <= 0:
 			#recuperer la pastille la plus proche
 			longest = 10000  
-			near = 0
+			near = None
 			for pallet in pallet_list:
 				dist = Distance(pallet[0], pallet[1], pac.x, pac.y)
+				print("palletDist =", dist, file=sys.stderr)
 				if dist < longest:
 					longest = dist
 					near = pallet
 			# y aller
-			my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
+			if near != None:
+				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(near[0]) + " " + str(near[1]) + " | ")
+			else:
+				my_action = my_action + ("MOVE "+ str(pac.id)+ " " + str(int(width/2)) + " " + str(int(height/2)) + " | ")
 		else:
 			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(ways[0][1]) + " "+ str(ways[0][2]) + " | ")
 
 	print(my_action)
+	old_visible_pac_count = visible_pac_count
 	print("Temps d execution : %s ms ---" % ((time.time() - start_time) * 1000), file=sys.stderr)
+	
 	# Write an action using print
 	# To debug: print("Debug messages...", file=sys.stderr)
 
