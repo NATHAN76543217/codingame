@@ -19,6 +19,13 @@ class pac_man():
 		self.oldy = 0
 		self.id = ID
 		self.type_id = type_id
+		if self.type_id == "ROCK":
+			self.type = 1
+		elif self.type_id == "PAPER":
+			self.type = 3
+		else:
+			self.type = 2
+		self.alive = 1
 		self.speed_turns_left = speed_turns_left
 		self.ability_cooldown = ability_cooldown
 		self.big_target = big_target
@@ -90,7 +97,7 @@ class pac_man():
 				score -= 1
 		#si c'est un mur arreter de chercher et renvoyer la position de la case avant le mur et le score 
 			elif ma_case.char == '#':
-				return ma_case.x -dx, ma_case.y-dy, score
+				return ma_case.x - dx, ma_case.y-dy, score
 		#sinon passer a la case d'apres
 			my += dy
 			mx += dx
@@ -132,7 +139,7 @@ TURN = 0
 myPacList = [] #liste de tous mes pac_man
 enPacList = [] #liste de tous les pac-man ennemies
 
-old_visible_pac_count = 100
+old_visible_pac_count = 0
 
 # print_map(my_map)
 # game loop
@@ -142,8 +149,7 @@ while True:
 	my_action = ""
 	my_score, opponent_score = [int(i) for i in input().split()]
 	visible_pac_count = int(input())  # all your pacs and enemy pacs in sight
-	if visible_pac_count < old_visible_pac_count:
-		TURN = 0
+
 
 	if TURN == 0:
 	#Si c'est le premier tour, initialiser les listes des pac-man
@@ -170,8 +176,10 @@ while True:
 				myPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
 			else:
 				enPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
+		print("len me:", len(myPacList), file=sys.stderr)
+		print("len en:", len(enPacList), file=sys.stderr)
 	else:
-	# chaque tour mettre a jour les information de mes pac-mans
+	# chaque tour mettre a jour les information des pac-mans
 		for i in range(visible_pac_count):
 			pac_id, mine, x, y, type_id, speed_turns_left, ability_cooldown = input().split()
 			pac_id = int(pac_id)
@@ -181,31 +189,56 @@ while True:
 			speed_turns_left = int(speed_turns_left)
 			ability_cooldown = int(ability_cooldown)
 			#Pour moi
+			enPacList = []
 			if mine == 1:
 				for pac in myPacList:
 					if pac_id == pac.id:
 						pac.x = x
 						pac.y = y
+						pac.alive = 1
 						pac.type_id = type_id
+						if pac.type_id == "ROCK":
+							pac.type = 1
+						elif pac.type_id == "PAPER":
+							pac.type = 3
+						else:
+							pac.type = 2
 						pac.speed_turns_left = speed_turns_left
 						pac.ability_cooldown = ability_cooldown
 			#pour les ennemies
 			else:
-				for pac in enPacList:
-					if pac_id == pac.id:
-						pac.x = x
-						pac.y = y
-						pac.type_id = type_id
-						pac.speed_turns_left = speed_turns_left
-						pac.ability_cooldown = ability_cooldown
+				enPacList.append(pac_man(pac_id, x, y, type_id, speed_turns_left, ability_cooldown))
+				# for en in enPacList:
+				# 	if pac_id == en.id:
+				# 		en.x = x
+				# 		en.y = y
+				# 		en.alive = 1
+				# 		en.type_id = type_id
+				# 		if en.type_id == "ROCK":
+				# 			en.type = 1
+				# 		elif en.type_id == "PAPER":
+				# 			en.type = 3
+				# 		else:
+				# 			en.type = 2
+				# 		en.speed_turns_left = speed_turns_left
+				# 		en.ability_cooldown = ability_cooldown
 
+	#Si il y a eu des morts:
+	if visible_pac_count < old_visible_pac_count:
+		for pac in myPacList:
+			if pac.alive == 0:
+				myPacList.remove(pac)
+		for en in enPacList:
+			if en.alive == 0:
+				enPacList.remove(en)
+	
 	#init my_map.pellet a 0
 	for ligne in my_map:
 		for case in ligne:
 			case.pellet = 0
 			case.value = 0
 
-	#recupere liste pellet
+	#recupere liste pellet (and big)
 	pallet_list = []
 	big_pallet_list = []
 	visible_pellet_count = int(input())  # all pellets in sight
@@ -219,11 +252,45 @@ while True:
 
 
 
-
+	print("len me:", len(myPacList), file=sys.stderr)
+	print("len en:", len(enPacList), file=sys.stderr)
 	for pac in myPacList:
-		print("for pac:", pac.id, file=sys.stderr)
+		print("\nfor pac:", pac.id, "type=", pac.type_id, file=sys.stderr)
+	#gere les ennemies
+		print("abil cooldown=", pac.ability_cooldown, file=sys.stderr)
+		if pac.ability_cooldown == 0:
+			ennemie_found = 0		
+			for en in enPacList:
+				dist = Distance(en.x, en.y, pac.x, pac.y)
+				if dist < 4:
+					res = pac.type - en.type
+					print("res =", res, "soit=", pac.type,  "-", en.type, file=sys.stderr)
+					print("en ID =", en.id, file=sys.stderr)
+					if res in (1, -2, 0):
+						#PERD AU PFC
+						#SWITCH
+						if en.type == 1:
+							my_switch = "PAPER"
+						elif en.type == 2:
+							my_switch = "ROCK"
+						else:
+							my_switch = "SCISSORS"
+						if pac.type_id != my_switch:
+							ennemie_found = 1
+							my_action +=  ("SWITCH " + str(pac.id) + " " + my_switch + " | ")
+							continue
+					else:
+						#GAGNE AU PFC
+						ennemie_found = 1
+						my_action += ("MOVE " + str(pac.id) + " " + str(en.x) + " " + str(en.y) + " | ")
+						continue
+			if ennemie_found == 0:
+				#SPEED TO EN
+				my_action += ("SPEED " + str(pac.id) + " | ")
+			pac.alive = 0
+			continue
 	#si pac-man bloqué
-		if pac.oldx == pac.x and pac.oldy == pac.y:
+		if pac.oldx == pac.x and pac.oldy == pac.y and pac.ability_cooldown != 9:
 			print("pac blocked, x=", x, "y=", y, file=sys.stderr)
 			pac.target = get_random_pos()
 			my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " "+ str(pac.target[1]) + " | ")
@@ -271,7 +338,6 @@ while True:
 			near = None
 			for pallet in pallet_list:
 				dist = Distance(pallet[0], pallet[1], pac.x, pac.y)
-				print("palletDist =", dist, file=sys.stderr)
 				if dist < longest:
 					longest = dist
 					near = pallet
@@ -294,7 +360,9 @@ while True:
 		my_action = my_action + ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " "+ str(pac.target[1]) + " | ")
 		pac.oldx = pac.x
 		pac.oldy = pac.y
-	
+		pac.alive = 0
+	for en in enPacList:
+		en.alive = 0
 	print(my_action)
 	old_visible_pac_count = visible_pac_count
 	print("Temps d execution : %s ms ---" % ((time.time() - start_time) * 1000), file=sys.stderr)
