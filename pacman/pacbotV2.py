@@ -30,6 +30,7 @@ class pac_man():
 		self.big = None
 		# self.target = []
 		self.needToSwitch = 0
+		self.my_switch = None
 		self.type_id = type_id
 		if self.type_id == "ROCK":
 			self.type = 1
@@ -44,6 +45,8 @@ class pac_man():
 		my = dy
 		score = 0
 		have_pallet = 0
+		mid_point = 0
+		csave = 0
 		while 1:
 			#Pour chaques cases dans le chemin 
 			found = 0
@@ -54,6 +57,8 @@ class pac_man():
 				mx -= width
 			elif self.x + mx == 0 and my_map[self.y + my][self.x + mx].char != '#' and dx == -1:
 				mx += width - 1
+				csave = mx
+				mid_point = 1
 			#Pour gerer le type de la case
 			ma_case = my_map[self.y + my][self.x + mx]
 			if ma_case.ctype == VIDE:
@@ -61,12 +66,24 @@ class pac_man():
 			elif ma_case.ctype == MUR:
 				if have_pallet == 0:
 					score = -10
-				return [(self.x + dx, self.y + dy), (ma_case.x, ma_case.y), score]
+				if mid_point == 1:
+					mid_point = 0
+					return [(self.x + dx, self.y + dy), (csave, ma_case.y), score]
+				else:
+					return [(self.x + dx, self.y + dy), (ma_case.x - dx, ma_case.y - dy), score]
 			elif ma_case.ctype == PACMAN:
 				if have_pallet == 0 or Distance(ma_case.x, ma_case.y, self.x, self.y) <= 2 or ma_case.obj.mine == 0:
 					score = -10
+				if ma_case.obj.mine == 0:
+					if self.type - ma_case.obj.type in (1, -2, 0):
+						self.needToSwitch = 1
+						self.set_my_switch(ma_case.obj.type_id)
 				score -= 3
-				return [(self.x + dx, self.y + dy), (ma_case.x, ma_case.y), score]
+				if mid_point == 1:
+					mid_point = 0
+					return [(self.x + dx, self.y + dy), (csave, ma_case.y), score]
+				else:
+					return [(self.x + dx, self.y + dy), (ma_case.x -dx, ma_case.y -dy), score]
 			elif ma_case.ctype == PALLET:
 				#Si il y a un pellet de meme position que la case
 				for pallet in pallet_list:
@@ -111,7 +128,13 @@ class pac_man():
 				near = big
 		self.big = near
 		return near
-
+	def set_my_switch(self, enTypeID):
+		if enTypeID == "PAPER":
+			self.my_switch = "SCISSORS"
+		elif enTypeID == "ROCK":
+			self.my_switch = "PAPER"
+		elif enTypeID == "SCISSORS":
+			self.my_switch = "ROCK"
 def Sqr(a):
 #recupere la carré de la valeur
 	return a*a
@@ -189,17 +212,18 @@ while True:
 		y = int(y)
 		speed_turns_left = int(speed_turns_left)
 		ability_cooldown = int(ability_cooldown)
-		#CREE UN PAC MAN
+		#####CREE UN PAC MAN
 		new_pac = pac_man(mine, pac_id, x, y, type_id, speed_turns_left, ability_cooldown)
 		#L'AJOUTE A LA MAP
-		my_map[y][x].ctype = PACMAN
-		my_map[y][x].obj = new_pac
-		my_map[y][x].char = 'P'
-		#SI IL EST A MOI, L'AJOUTE A MYPACLIST
-		if mine == 1:
-			myPacList.append(new_pac)
-		else:
-			enPacList.append(new_pac)
+		if new_pac.type_id != "DEAD":
+			my_map[y][x].ctype = PACMAN
+			my_map[y][x].obj = new_pac
+			my_map[y][x].char = 'P'
+			#SI IL EST A MOI, L'AJOUTE A MYPACLIST
+			if mine == 1:
+				myPacList.append(new_pac)
+			else:
+				enPacList.append(new_pac)
 	#CREE LES LISTES DE PELLETS
 	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
@@ -214,7 +238,7 @@ while True:
 	count = 0
 	for pac in myPacList:
 		print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, old_pos[pac.id][0], old_pos[pac.id][1]), file=sys.stderr)
-		if pac.x == old_pos[pac.id][0] and pac.y == old_pos[pac.id][1]:
+		if pac.x == old_pos[pac.id][0] and pac.y == old_pos[pac.id][1] and (pac.speed_turns_left != 5):
 			print("pac", pac.id, "bloqué", file=sys.stderr)
 			count += 1
 		if count >= 2:
@@ -229,9 +253,9 @@ while True:
 		paths.sort(key= lambda x: x[2], reverse=True)
 		#SI BESOIN DE SWITCH
 		#TODO fonction need to switch
-		if pac.needToSwitch and pac.ability_cooldown <= 3:
-			my_switch = None
-			my_action +=  ("SWITCH " + str(pac.id) + " " + my_switch + " | ")
+		if pac.needToSwitch and pac.ability_cooldown == 0:
+			print("SWITCH", file=sys.stderr)
+			my_action +=  ("SWITCH " + str(pac.id) + " " + pac.my_switch + " | ")
 		#SINON SI POSSIBILITE DE SPEED
 		elif pac.ability_cooldown == 0:
 			my_action += ("SPEED " + str(pac.id) + " | ")
@@ -242,12 +266,11 @@ while True:
 			my_action += ("MOVE " + str(pac.id) + " " + str(pac.big[0]) + " " + str(pac.big[1]) + " | ")
 		#SINON SI AUCUNE PASTILLE SUR LES CHEMINS
 		elif paths[0][2] <= -10: #je regard le score du chemin avec le meilleur score
-			# idee: si il reste un big pas pris, y aller
 			# #aller a la pastille la plus proche
-			print("NEAR", file=sys.stderr)
 			clist = get_pallet_map_list(my_map)
 			clist.sort(key = lambda case: Distance(case.x, case.y, pac.x, pac.y))
 			clist[0].targeted = 1
+			print("NEAR at", clist[0].x, clist[0].y, file=sys.stderr)
 			my_action += ("MOVE " + str(pac.id) + " " + str(clist[0].x) + " " + str(clist[0].y) + " | ")
 		#SINON ALLER AU BOUT DU MEILLEUR CHEMIN
 		else:
@@ -277,4 +300,11 @@ while True:
 #
 # certain des pellet n'apparaissent pas comme pris
 # optimiser (passer a numpy)
-# si en face c'est un pacman ennemie (qui me bat qui plus est) je condamne ce cemin
+# si en face c'est un pacman ennemie (qui me bat qui plus est) je condamne ce chemin
+# Si il ne reste plus qu'un pac ennemie, le bouffer
+# idee: si il reste un big pas pris, y aller
+# Si sequence bloquage: je suis bloqué contre un ennemie et quand je me transforme ca ne debloque pas
+# (il s'est transformé aussi) alors je me transforme en anticipant sa transformation
+#
+#IDEE :
+# Gerer les pellets par zone ou paquet; plutot que d'aller au pellet le plus proche, je vais au groupe de pellet avec le meilleur ration plein, distance
