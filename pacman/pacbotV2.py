@@ -1,4 +1,4 @@
-#MODULES EXTERNES
+# MODULES EXTERNES
 import sys
 import math
 import time
@@ -21,14 +21,17 @@ class pac_man():
 	def __init__(self, mine, ID, x, y, type_id, speed_turns_lest, ability_cooldown, big_target = None):
 		self.x = x
 		self.y = y
-		# self.oldx = 0
-		# self.oldy = 0
+		self.oldx = 0
+		self.oldy = 0
 		self.id = ID
 		self.speed_turns_left = speed_turns_left
 		self.ability_cooldown = ability_cooldown
+		self.transformed = 0
 		self.mine = mine
 		self.big = None
-		# self.target = []
+		self.have_target = 0
+		self.target = None
+		self.ignored = 0
 		self.needToSwitch = 0
 		self.my_switch = None
 		self.type_id = type_id
@@ -39,7 +42,7 @@ class pac_man():
 		elif self.type_id == "PAPER":
 			self.type = 3
 		
-	def get_path(self, pallet_list, my_map, dx, dy):
+	def get_path(self, pallet_list, big_list, my_map, dx, dy):
 	#renvoi deux tuples pour les coord de la 1er et derniere case plus le score du chemin 	
 		mx = dx
 		my = dy
@@ -72,13 +75,29 @@ class pac_man():
 				else:
 					return [(self.x + dx, self.y + dy), (ma_case.x - dx, ma_case.y - dy), score]
 			elif ma_case.ctype == PACMAN:
-				if have_pallet == 0 or Distance(ma_case.x, ma_case.y, self.x, self.y) <= 2 or ma_case.obj.mine == 0:
+				dist = Distance(ma_case.x, ma_case.y, self.x, self.y)
+				if have_pallet == 0 or (dist <= 2 and dist != 0) or ma_case.obj.mine == 0:
 					score = -10
 				if ma_case.obj.mine == 0:
+					print("PAC ENNEMIE DETECTED", ma_case.x, ma_case.y, ma_case.obj.id, ma_case.obj.x, ma_case.obj.y, ma_case.char, ma_case.obj.type_id, file=sys.stderr)
 					if self.type - ma_case.obj.type in (1, -2, 0):
-						self.needToSwitch = 1
-						self.set_my_switch(ma_case.obj.type_id)
-				score -= 3
+						#si je suis moins fort que lui
+						near = self.big_near(big_list)
+						if self.ability_cooldown <= 1 and near[1] > Distance(ma_case.x, ma_case.y, self.x, self.y):
+							#si je peux me transformer
+							#je le fais et je lui fonce dessus
+							self.needToSwitch = 1
+							self.set_my_switch(ma_case.obj.type_id)
+							self.have_target = 1
+							self.target = ma_case.obj.x, ma_case.obj.y
+						else:
+							score -= 100
+							#le fuire
+					elif Distance(self.x, self.y, ma_case.obj.x, ma_case.obj.y) <= 3:
+						#si je suis plus fort que lui je lui foncer dessus si il est plus proche que 3
+						self.have_target = 1
+						self.target = ma_case.obj.x, ma_case.obj.y
+					score -= 3
 				if mid_point == 1:
 					mid_point = 0
 					return [(self.x + dx, self.y + dy), (csave, ma_case.y), score]
@@ -98,7 +117,7 @@ class pac_man():
 			# on passe a la case d'apres
 			mx += dx
 			my += dy
-	def checkNESW(self, pallet_list, my_map):
+	def checkNESW(self, pallet_list, big_pallet_list, my_map):
 		#renvoie une liste de chemins
 		#doit gerer la sortie droite
 		ways = []
@@ -115,7 +134,7 @@ class pac_man():
 			elif i == 3:
 				dx = -1
 			if self.x + dx == width or my_map[self.y+dy][self.x + dx].char != '#':
-					ways.append(self.get_path(pallet_list, my_map, dx, dy))
+					ways.append(self.get_path(pallet_list, big_pallet_list, my_map, dx, dy))
 		return ways
 	def big_near(self, big_list):
 	#renvoie le big le plus proche de pac man a - de 5 de dist sinon None 
@@ -127,7 +146,7 @@ class pac_man():
 				shortest = dist
 				near = big
 		self.big = near
-		return near
+		return near, shortest
 	def set_my_switch(self, enTypeID):
 		if enTypeID == "PAPER":
 			self.my_switch = "SCISSORS"
@@ -185,23 +204,24 @@ for y in range(height):
 		x += 1
 	my_map.append(my_line)
 
-old_pos = [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)]
+TURN = 0
+myPacList = []
 # game loop
 while True:
 	start_time = time.time()
-	myPacList = []
-	enPacList = []
 	pallet_list = []
 	big_pallet_list = []
 	my_action = ""
 	my_score, opponent_score = [int(i) for i in input().split()]
 	visible_pac_count = int(input())  # all your pacs and enemy pacs in sight
+
 	#RAFRAICHIR LA MAP (VIRER TOUT LES PACMAN)
 	for row in my_map:
 		for my_case in row:
 			if my_case.ctype == PACMAN:
 				my_case.ctype = VIDE
-				del(my_case.obj)
+				my_case.char = ' '
+				my_case.obj = None
 	#RECUPERE INFO POUR CHAQUE PACMAN VISIBLE
 	for i in range(visible_pac_count):
 		#RECUPERE INFO PACMAN
@@ -212,18 +232,48 @@ while True:
 		y = int(y)
 		speed_turns_left = int(speed_turns_left)
 		ability_cooldown = int(ability_cooldown)
-		#####CREE UN PAC MAN
-		new_pac = pac_man(mine, pac_id, x, y, type_id, speed_turns_left, ability_cooldown)
-		#L'AJOUTE A LA MAP
-		if new_pac.type_id != "DEAD":
-			my_map[y][x].ctype = PACMAN
-			my_map[y][x].obj = new_pac
-			my_map[y][x].char = 'P'
+		if TURN == 0:
+			#####CREE UN PAC MAN
+			new_pac = pac_man(mine, pac_id, x, y, type_id, speed_turns_left, ability_cooldown)
 			#SI IL EST A MOI, L'AJOUTE A MYPACLIST
 			if mine == 1:
 				myPacList.append(new_pac)
+			my_map[y][x].ctype = PACMAN
+			my_map[y][x].obj = new_pac
+			my_map[y][x].char = 'P'	
+
+		else:
+		#MET A JOUR LES INFO DES PACS
+			if mine == 1:
+				for pac in myPacList:
+					if pac.id == pac_id:
+						pac.x = x
+						pac.y = y
+						pac.type_id = type_id
+						if pac.type_id == "ROCK":
+							pac.type = 1
+						elif pac.type_id == "SCISSORS":
+							pac.type = 2
+						elif pac.type_id == "PAPER":
+							pac.type = 3
+						pac.speed_turns_left = speed_turns_left
+						pac.ability_cooldown = ability_cooldown
+						if pac.type_id != "DEAD":
+							#L'AJOUTE A LA MAP
+							my_map[y][x].ctype = PACMAN
+							my_map[y][x].obj = pac
+							my_map[y][x].char = 'P'
+						else:
+							#si le pac est mort
+							print("DEBUG remove pacid:", pac.id, file=sys.stderr)
+							myPacList.remove(pac)
 			else:
-				enPacList.append(new_pac)
+				if type_id != "DEAD":
+					new_pac = pac_man(mine, pac_id, x, y, type_id, speed_turns_left, ability_cooldown)
+					# enPacList.append(new_pac)
+					my_map[y][x].ctype = PACMAN
+					my_map[y][x].obj = new_pac
+					my_map[y][x].char = 'P'
 	#CREE LES LISTES DE PELLETS
 	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
@@ -237,31 +287,45 @@ while True:
 	#RESOUDRE LES COLLISIONS
 	count = 0
 	for pac in myPacList:
-		print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, old_pos[pac.id][0], old_pos[pac.id][1]), file=sys.stderr)
-		if pac.x == old_pos[pac.id][0] and pac.y == old_pos[pac.id][1] and (pac.speed_turns_left != 5):
+		print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, pac.oldx, pac.oldy), file=sys.stderr)
+		if pac.x == pac.oldx and pac.y == pac.oldy and pac.transformed != 1:
 			print("pac", pac.id, "bloqué", file=sys.stderr)
 			count += 1
 		if count >= 2:
 			rd = get_random_pos()
 			my_action += ("MOVE "+ str(pac.id) + " "+ str(rd[0]) + " " + str(rd[1]) + " | ")
-			myPacList.remove(pac)
+			pac.ignored = 1
+
 	#POUR CHAQUE PACMAN
 	for pac in myPacList:
 		print("pac ID:", pac.id, file=sys.stderr)
+		#SI PACMAN BLOQUE
+		if pac.ignored == 1:
+			print("IGNORED", file=sys.stderr)
+			pac.ignored = 0
+			continue
+		pac.transformed = 0
+		pac.have_target = 0
+		pac.target = None
 		#MISE A JOUR DE LA MAP ET RECUPERATION NESW
-		paths = pac.checkNESW(pallet_list, my_map)
+		paths = pac.checkNESW(pallet_list, big_pallet_list, my_map)
 		paths.sort(key= lambda x: x[2], reverse=True)
 		#SI BESOIN DE SWITCH
-		#TODO fonction need to switch
 		if pac.needToSwitch and pac.ability_cooldown == 0:
 			print("SWITCH", file=sys.stderr)
+			pac.transformed = 1
+			pac.needToSwitch = 0
 			my_action +=  ("SWITCH " + str(pac.id) + " " + pac.my_switch + " | ")
 		#SINON SI POSSIBILITE DE SPEED
 		elif pac.ability_cooldown == 0:
+			pac.transformed = 1
 			my_action += ("SPEED " + str(pac.id) + " | ")
+		elif pac.have_target == 1: #and target plus pres que le plus pres des big:
+			print("HUNT", file=sys.stderr)
+			my_action += ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " " + str(pac.target[1]) + " | ")
 		#SINON SI BIG PROCHE
-		elif pac.big_near(big_pallet_list) is not None:
-			print("BIG", file=sys.stderr)
+		elif pac.big_near(big_pallet_list)[0] is not None:
+			print("BIG:", pac.big, file=sys.stderr)
 			big_pallet_list.remove(pac.big)
 			my_action += ("MOVE " + str(pac.id) + " " + str(pac.big[0]) + " " + str(pac.big[1]) + " | ")
 		#SINON SI AUCUNE PASTILLE SUR LES CHEMINS
@@ -269,21 +333,17 @@ while True:
 			# #aller a la pastille la plus proche
 			clist = get_pallet_map_list(my_map)
 			clist.sort(key = lambda case: Distance(case.x, case.y, pac.x, pac.y))
-			clist[0].targeted = 1
+			clist[0].obj.targeted = 1
 			print("NEAR at", clist[0].x, clist[0].y, file=sys.stderr)
 			my_action += ("MOVE " + str(pac.id) + " " + str(clist[0].x) + " " + str(clist[0].y) + " | ")
 		#SINON ALLER AU BOUT DU MEILLEUR CHEMIN
 		else:
 			print("PATH:", paths,  file=sys.stderr)
 			my_action += ("MOVE "+ str(pac.id) + " "+ str(paths[0][1][0]) + " " + str(paths[0][1][1]) + " | ")
-		old_pos[pac.id] = (pac.x, pac.y)
+		pac.oldx = pac.x
+		pac.oldy = pac.y
 	#FIN DU TOUR
-	#REINIT PACMAN POS IN MAP
-	for pac in myPacList + enPacList:
-		my_map[pac.y][pac.x].char = ' '
-		my_map[pac.y][pac.x].ctype = VIDE
-		my_map[pac.y][pac.x].obj = None
-		
+	TURN = 1
 	print(my_action)
 	print("Temps d execution : %s ms" % ((time.time() - start_time) * 1000), file=sys.stderr)
 
@@ -292,19 +352,3 @@ while True:
 # 1er tuple = 1er case du chemin
 # 2eme tuple = derniere case du chemin (si mur renvoie ase d'avant si pacman renvoie la case du pacman)
 # int = score
-
-#a corriger
-# postionnement de pac dans la map
-# need to switch: si il y a un pac ennemie dans ma ligne de vue
-# 
-#
-# certain des pellet n'apparaissent pas comme pris
-# optimiser (passer a numpy)
-# si en face c'est un pacman ennemie (qui me bat qui plus est) je condamne ce chemin
-# Si il ne reste plus qu'un pac ennemie, le bouffer
-# idee: si il reste un big pas pris, y aller
-# Si sequence bloquage: je suis bloqué contre un ennemie et quand je me transforme ca ne debloque pas
-# (il s'est transformé aussi) alors je me transforme en anticipant sa transformation
-#
-#IDEE :
-# Gerer les pellets par zone ou paquet; plutot que d'aller au pellet le plus proche, je vais au groupe de pellet avec le meilleur ration plein, distance
