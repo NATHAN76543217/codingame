@@ -85,15 +85,21 @@ class pac_man():
 						# near = self.big_near(big_list)
 						print("Loose", file=sys.stderr)
 						dist_ennemie = Distance(ma_case.x, ma_case.y, self.x, self.y)
-						if self.ability_cooldown <= 1 and dist_ennemie < 6 and dist_ennemie > ability_cooldown :
+						if self.ability_cooldown <= 1 and dist_ennemie < 6 and dist_ennemie -1 > self.ability_cooldown :
+							print("transform", file=sys.stderr)
 						# 	#si je peux me transformer
 						# 	#je le fais et je lui fonce dessus
 							self.needToSwitch = 1
 							self.set_my_switch(ma_case.obj.type_id)
 							self.have_target = 1
 							self.target = ma_case.obj.x, ma_case.obj.y
-
 						else:
+							#avoir une target qui m'empeche dans tout les cas de me jeter dans la gueule du loup
+							self.have_target = 1
+							print("get_safe", file=sys.stderr)
+							self.target = self.get_safe_place(my_map, ma_case, dx, dy)
+							if self.have_target == 1:
+								print("safe:", self.target, file=sys.stderr)
 							score -= 100
 							#le fuire
 					# elif Distance(self.x, self.y, ma_case.obj.x, ma_case.obj.y) <= 2 and self.turnturn_count <= 3:
@@ -149,6 +155,30 @@ class pac_man():
 			if self.x + dx == width or my_map[self.y+dy][self.x + dx].char != '#':
 					ways.append(self.get_path(pallet_list, big_pallet_list, my_map, dx, dy))
 		return ways
+	def get_safe_place(self, my_map, oppo_case, bx, by):
+		#renvoir une target qui empeche de passer par la case oppo_case
+		for i in range(4):
+			#Pour chacunes des 4 directions
+			dx = 0
+			dy = 0
+			if i == 0:
+				dy = -1
+			elif i == 1:
+				dx = 1
+			elif i == 2:
+				dy = 1
+			elif i == 3:
+				dx = -1
+			px = self.x + dx
+			py = self.y + dy
+			if px < 0:
+				px += width
+			elif px == width:
+				px -= width
+			print("test:", px, py, "|", dx, dy, bx, by, file=sys.stderr)
+			if my_map[py][px].char != '#' and (dx != bx or dy != by): #doit etre une case libre pas dans la direction de l'ennemie
+				return px, py
+		self.have_target = 0
 	def big_near(self, big_list):
 	#renvoie le big le plus proche de pac man a - de 5 de dist sinon None 
 		shortest = 7
@@ -300,7 +330,7 @@ while True:
 	#RESOUDRE LES COLLISIONS
 	count = 0
 	for pac in myPacList:
-		print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, pac.oldx, pac.oldy), file=sys.stderr)
+		# print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, pac.oldx, pac.oldy), file=sys.stderr)
 		if pac.x == pac.oldx and pac.y == pac.oldy and pac.transformed != 1:
 			print("pac", pac.id, "bloqué", file=sys.stderr)
 			count += 1
