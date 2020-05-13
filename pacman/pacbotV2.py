@@ -94,15 +94,8 @@ class pac_man():
 							self.target = ma_case.obj.x, ma_case.obj.y
 
 						else:
+							#condamne le passage
 							score -= 100
-							#le fuire
-					# elif Distance(self.x, self.y, ma_case.obj.x, ma_case.obj.y) <= 2 and self.turnturn_count <= 3:
-					# # 	#si je suis plus fort que lui je lui fonce mais pas pendant plus de 3 tours
-					# 	self.have_target = 1
-					# 	self.target = ma_case.obj.x, ma_case.obj.y
-					# 	turn_count += 1
-					# 	if turn_count == 3:
-					# 		turn_count = 0
 					score -= 3
 				if mid_point == 1:
 					mid_point = 0
@@ -120,6 +113,9 @@ class pac_man():
 				#Si il y a un pellet de meme position que la case
 				for pallet in pallet_list:
 					if pallet[0] == ma_case.x and pallet[1] == ma_case.y:
+						if pallet[2] == 10:
+							self.have_target = 1
+							self.target = ma_case.x + dx, ma_case.y + dy
 						found = 1
 						have_pallet = 1
 						score += 1
@@ -151,7 +147,7 @@ class pac_man():
 		return ways
 	def big_near(self, big_list):
 	#renvoie le big le plus proche de pac man a - de 5 de dist sinon None 
-		shortest = 7
+		shortest = 6
 		near = None
 		for big in big_list:
 			dist = Distance(big[0], big[1], self.x, self.y)
@@ -181,11 +177,17 @@ def get_random_pos():
 def get_pallet_map_list(my_map):
 #renvoie une liste de cases contenant des pellets
 	lst = []
+	rescu = []
 	for ligne in my_map:
 		for case in ligne:
 			if case.ctype == PALLET and case.obj.targeted == 0:
 				lst.append(case)
-	return lst			
+			elif case.ctype == PALLET:
+				rescu.append(case)
+	if len(lst) == 0:
+		return rescu
+	else:
+		return lst			
 def create_case(x, y, char):
 	if char == '#':
 		return case(x, y, char, MUR)
@@ -254,7 +256,6 @@ while True:
 			my_map[y][x].ctype = PACMAN
 			my_map[y][x].obj = new_pac
 			my_map[y][x].char = 'P'	
-
 		else:
 		#MET A JOUR LES INFO DES PACS
 			if mine == 1:
@@ -291,10 +292,9 @@ while True:
 	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
 		x, y, value = [int(j) for j in input().split()]
-		pallet_list.append((x, y))
+		pallet_list.append((x, y, value))
 		if value > 1:
-			big_pallet_list.append([x, y])
-		
+			big_pallet_list.append([x, y])	
 
 	print_map(my_map)
 	#RESOUDRE LES COLLISIONS
@@ -333,6 +333,7 @@ while True:
 		elif pac.ability_cooldown == 0:
 			pac.transformed = 1
 			my_action += ("SPEED " + str(pac.id) + " | ")
+		#SINON SI HAVE TARGET
 		elif pac.have_target == 1: #and target plus pres que le plus pres des big:
 			print("HUNT", file=sys.stderr)
 			my_action += ("MOVE "+ str(pac.id) + " "+ str(pac.target[0]) + " " + str(pac.target[1]) + " | ")
