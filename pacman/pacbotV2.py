@@ -26,10 +26,9 @@ class pac_man():
 		self.id = ID
 		self.speed_turns_left = speed_turns_left
 		self.ability_cooldown = ability_cooldown
-		self.transformed = 0	#si le pac c'est transformé au tour precedent
+		self.transformed = 0
 		self.mine = mine
-		self.big = None		#emplacement du big que l'on poursuit
-		self.side = 0		#cote de la map ou se trouve le pacman
+		self.big = None
 		self.have_target = 0
 		self.target = None
 		self.ignored = 0
@@ -179,22 +178,14 @@ def get_random_pos():
 	x = random.randint(0, width -1)
 	y = random.randint(0, height -1)
 	return (x, y)
-def get_pallet_map_list(my_map, pac_side):
-#renvoie une liste de cases contenant des pellets (de mon cotee seulement)
+def get_pallet_map_list(my_map):
+#renvoie une liste de cases contenant des pellets
 	lst = []
-	rescu = []
-	print("pac_side=", pac_side, file=sys.stderr)
 	for ligne in my_map:
 		for case in ligne:
-			if case.ctype == PALLET and case.obj.targeted == 0 and (case.x > width / 2) == pac_side:
+			if case.ctype == PALLET and case.obj.targeted == 0:
 				lst.append(case)
-			elif case.ctype == PALLET:
-				rescu.append(case)
-	print("len lst=", len(lst), file=sys.stderr)
-	if len(lst) == 0:
-		return rescu
-	else:
-		return lst			
+	return lst			
 def create_case(x, y, char):
 	if char == '#':
 		return case(x, y, char, MUR)
@@ -271,7 +262,6 @@ while True:
 					if pac.id == pac_id:
 						pac.x = x
 						pac.y = y
-						pac.side = pac.x > width/2
 						pac.type_id = type_id
 						if pac.type_id == "ROCK":
 							pac.type = 1
@@ -297,7 +287,7 @@ while True:
 					my_map[y][x].ctype = PACMAN
 					my_map[y][x].obj = new_pac
 					my_map[y][x].char = 'P'
-	#CREE LES LISTES DE PELLETS DECOUVERT
+	#CREE LES LISTES DE PELLETS
 	visible_pellet_count = int(input())  # all pellets in sight
 	for i in range(visible_pellet_count):
 		x, y, value = [int(j) for j in input().split()]
@@ -310,7 +300,7 @@ while True:
 	#RESOUDRE LES COLLISIONS
 	count = 0
 	for pac in myPacList:
-		# print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, pac.oldx, pac.oldy), file=sys.stderr)
+		print("x= {} y = {} oldx = {} oldy = {}".format(pac.x, pac.y, pac.oldx, pac.oldy), file=sys.stderr)
 		if pac.x == pac.oldx and pac.y == pac.oldy and pac.transformed != 1:
 			print("pac", pac.id, "bloqué", file=sys.stderr)
 			count += 1
@@ -354,12 +344,11 @@ while True:
 		#SINON SI AUCUNE PASTILLE SUR LES CHEMINS
 		elif paths[0][2] <= -10: #je regard le score du chemin avec le meilleur score
 			# #aller a la pastille la plus proche
-			clist = get_pallet_map_list(my_map, pac.side)
+			clist = get_pallet_map_list(my_map)
 			clist.sort(key = lambda case: Distance(case.x, case.y, pac.x, pac.y))
-			if len(clist) != 0:
-				clist[0].obj.targeted = 1
-				print("NEAR at", clist[0].x, clist[0].y, file=sys.stderr)
-				my_action += ("MOVE " + str(pac.id) + " " + str(clist[0].x) + " " + str(clist[0].y) + " | ")
+			clist[0].obj.targeted = 1
+			print("NEAR at", clist[0].x, clist[0].y, file=sys.stderr)
+			my_action += ("MOVE " + str(pac.id) + " " + str(clist[0].x) + " " + str(clist[0].y) + " | ")
 		#SINON ALLER AU BOUT DU MEILLEUR CHEMIN
 		else:
 			print("PATH:", paths,  file=sys.stderr)
