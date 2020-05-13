@@ -113,9 +113,16 @@ class pac_man():
 				#Si il y a un pellet de meme position que la case
 				for pallet in pallet_list:
 					if pallet[0] == ma_case.x and pallet[1] == ma_case.y:
-						if pallet[2] == 10:
-							self.have_target = 1
-							self.target = ma_case.x + dx, ma_case.y + dy
+						#si c'est un gros pellet
+						# #TODO a remove si non benefique
+						# if pallet[2] == 10:
+						# 	self.have_target = 1
+						# 	self.target = ma_case.x + dx, ma_case.y + dy
+						# 	return [(self.x + dx, self.y + dy), (ma_case.x + dx, ma_case.y + dy), score]
+						#sinon si c
+						# TODO a remove si non benefique
+						if (ma_case.y == 1 and dy == -1) or (ma_case.y == height - 2 and dy == 1):
+							score += 2
 						found = 1
 						have_pallet = 1
 						score += 1
