@@ -81,28 +81,41 @@ class pac_man():
 				if ma_case.obj.mine == 0:
 					print("PAC ENNEMIE DETECTED", ma_case.x, ma_case.y, ma_case.obj.id, ma_case.obj.x, ma_case.obj.y, ma_case.char, ma_case.obj.type_id, file=sys.stderr)
 					if self.type - ma_case.obj.type in (1, -2, 0):
-						#si je suis moins fort que lui
-						near = self.big_near(big_list)
-						if self.ability_cooldown <= 1 and near[1] > Distance(ma_case.x, ma_case.y, self.x, self.y):
-							#si je peux me transformer
-							#je le fais et je lui fonce dessus
+					#si je suis moins fort que lui
+						# near = self.big_near(big_list)
+						print("Loose", file=sys.stderr)
+						dist_ennemie = Distance(ma_case.x, ma_case.y, self.x, self.y)
+						if self.ability_cooldown <= 1 and dist_ennemie < 6 and dist_ennemie > ability_cooldown :
+						# 	#si je peux me transformer
+						# 	#je le fais et je lui fonce dessus
 							self.needToSwitch = 1
 							self.set_my_switch(ma_case.obj.type_id)
 							self.have_target = 1
 							self.target = ma_case.obj.x, ma_case.obj.y
+
 						else:
 							score -= 100
 							#le fuire
-					elif Distance(self.x, self.y, ma_case.obj.x, ma_case.obj.y) <= 3:
-						#si je suis plus fort que lui je lui foncer dessus si il est plus proche que 3
-						self.have_target = 1
-						self.target = ma_case.obj.x, ma_case.obj.y
+					# elif Distance(self.x, self.y, ma_case.obj.x, ma_case.obj.y) <= 2 and self.turnturn_count <= 3:
+					# # 	#si je suis plus fort que lui je lui fonce mais pas pendant plus de 3 tours
+					# 	self.have_target = 1
+					# 	self.target = ma_case.obj.x, ma_case.obj.y
+					# 	turn_count += 1
+					# 	if turn_count == 3:
+					# 		turn_count = 0
 					score -= 3
 				if mid_point == 1:
 					mid_point = 0
+					print("MID, csave=", csave, file=sys.stderr)
+					if csave < 0:
+						csave += width
+					print("csave=", csave, file=sys.stderr)
 					return [(self.x + dx, self.y + dy), (csave, ma_case.y), score]
 				else:
-					return [(self.x + dx, self.y + dy), (ma_case.x -dx, ma_case.y -dy), score]
+					px = ma_case.x -dx
+					if px < 0:
+						px += width
+					return [(self.x + dx, self.y + dy), (px, ma_case.y -dy), score]
 			elif ma_case.ctype == PALLET:
 				#Si il y a un pellet de meme position que la case
 				for pallet in pallet_list:
@@ -138,7 +151,7 @@ class pac_man():
 		return ways
 	def big_near(self, big_list):
 	#renvoie le big le plus proche de pac man a - de 5 de dist sinon None 
-		shortest = 5
+		shortest = 7
 		near = None
 		for big in big_list:
 			dist = Distance(big[0], big[1], self.x, self.y)
