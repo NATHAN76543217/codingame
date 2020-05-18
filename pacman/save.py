@@ -81,7 +81,7 @@ class pac_man():
 			elif ma_case.ctype == PACMAN:
 				dist = Distance(ma_case.x, ma_case.y, self.x, self.y)
 				if have_pallet == 0 or (dist <= 2 and dist != 0) or ma_case.obj.mine == 0:
-					score = -11
+					score = -13
 				if ma_case.obj.mine == 0:
 					print("PAC ENNEMIE DETECTED", ma_case.x, ma_case.y, ma_case.obj.id, ma_case.obj.x, ma_case.obj.y, ma_case.char, ma_case.obj.type_id, file=sys.stderr)
 					if self.type - ma_case.obj.type in (1, -2, 0):
@@ -104,7 +104,11 @@ class pac_man():
 							#TODO
 							if Distance(self.x, self.y, ma_case.x, ma_case.y) < 3:
 								my_map[self.y][self.x].indesirable = 1
+					elif Distance(self.x, self.y, ma_case.x, ma_case.y) == 1:
+						self.have_target = 1
+						self.target = ma_case.x, ma_case.y
 					score -= 3
+				
 				if mid_point == 1:
 					mid_point = 0
 					print("MID, csave=", csave, file=sys.stderr)
@@ -220,60 +224,6 @@ def print_map(my_map):
 def print_path(path):
 #affiche un chemin
 	print("PATH from: %s to : %s score: %s" % path[0], path[1], path[2], file=sys.stderr)
-def get_path_score(pac, my_map, first_case, clist):
-	found = 1
-	case_actu = first_case #clist[0]
-	pellet_count = 1
-	pos = case_actu.x, case_actu.y
-	clist.remove(first_case)
-	preced = '0'
-	while found == 1 and pellet_count <= 20: 
-		found = 0
-		try:
-			if my_map[case_actu.y -1][case_actu.x].ctype == PALLET and preced != 'N':
-				pellet_count += 1
-				found = 1
-				preced = 'S'
-				case_actu = my_map[case_actu.y -1][case_actu.x]
-				try:
-					clist.remove(case_actu)
-				except:
-					print("case not in list", file=sys.stderr)
-			elif my_map[case_actu.y][case_actu.x + 1].ctype == PALLET and preced != 'E':
-				pellet_count += 1
-				found = 1
-				preced = 'W'
-				case_actu = my_map[case_actu.y][case_actu.x + 1]
-				try:
-					clist.remove(case_actu)
-				except:
-					print("case not in list", file=sys.stderr)
-			elif my_map[case_actu.y + 1][case_actu.x].ctype == PALLET and preced != 'S':
-				pellet_count += 1
-				found = 1
-				preced = 'N'
-				case_actu = my_map[case_actu.y + 1][case_actu.x]
-				try:
-					clist.remove(case_actu)
-				except:
-					print("case not in list", file=sys.stderr)
-			elif my_map[case_actu.y][case_actu.x - 1].ctype == PALLET and preced != 'W':
-				pellet_count += 1
-				found = 1
-				preced = 'E'
-				case_actu = my_map[case_actu.y][case_actu.x - 1]
-				try:
-					clist.remove(case_actu)
-				except:
-					print("case not in list", file=sys.stderr)
-		except IndexError:
-			if case_actu.x + 1 == width:
-				case_actu.x -= width
-			elif case_actu.x -1 < 0:
-				case_actu.x += width
-	score = pellet_count - Distance(pac.x, pac.y, pos[0], pos[1])
-	return pos, score
-
 width, height = [int(i) for i in input().split()]
 #CONSTANTES POUR LA MAP
 VIDE = 0
@@ -422,21 +372,14 @@ while True:
 			my_action += ("MOVE " + str(pac.id) + " " + str(pac.big[0]) + " " + str(pac.big[1]) + " | ")
 		#SINON SI AUCUNE PASTILLE SUR LES CHEMINS
 		#TODO
-		elif paths[0][2] <= -10 and paths[-1][2] > -100: #je regard le score du chemin avec le meilleur score
+		elif paths[0][2] <= -10 and paths[-1][2] > -13: #je regard le score du chemin avec le meilleur score
 			# aller a la pastille la plus proche
 			clist = get_pallet_map_list(my_map)
-			clist.sort(key = lambda case: Distance(case.x, case.y, pac.x, pac.y)) #stocker la distance dans la clist
-			# clist[0].obj.targeted = 1
-			i = 0
-			score = get_path_score(pac, my_map, clist[0], clist)
-			while i < 2:
-				tmp = get_path_score(pac, my_map, clist[0], clist)
-				if tmp[1] > score[1]:
-					score = tmp
-				i+= 1
-			print("SCORE:", score,  file=sys.stderr)
-			print("NEAR at", score[0][0], score[0][1], file=sys.stderr)
-			my_action += ("MOVE " + str(pac.id) + " " + str(score[0][0]) + " " + str(score[0][1]) + " | ")
+			clist.sort(key = lambda case: Distance(case.x, case.y, pac.x, pac.y))
+			clist[0].obj.targeted = 1
+			print("PATH:", paths,  file=sys.stderr)
+			print("NEAR at", clist[0].x, clist[0].y, file=sys.stderr)
+			my_action += ("MOVE " + str(pac.id) + " " + str(clist[0].x) + " " + str(clist[0].y) + " | ")
 		#SINON ALLER AU BOUT DU MEILLEUR CHEMIN
 		else:
 			print("PATH:", paths,  file=sys.stderr)
